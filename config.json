@@ -1,0 +1,45 @@
+{
+    "port": 9001,
+    "cdnURL": "https://be-vms.app.bio-experience.com/cdn/upload",
+    "presets": {
+        "ipsotek": {
+            "maxWidth": 800,
+            "maxHeight": 800,
+            "detectFace": true,
+            "confidence": 0.8,
+            "cropImage": true,
+            "qualityCompression": 85,
+            "pixelCompression": 100,
+            "compressFileSize": 10000
+        },
+        "falco": {
+            "maxWidth": 920,
+            "maxHeight": 1280,
+            "detectFace": true,
+            "confidence": 0.8,
+            "cropImage": false, 
+            "qualityCompression": 75,
+            "pixelCompression": 100,
+            "compressFileSize": 25000
+        },
+        "abc": {
+            "maxWidth": 400,
+            "maxHeight": 960,
+            "detectFace": true,
+            "confidence": 0.8,
+            "cropImage": false,
+            "qualityCompression": 85,
+            "pixelCompression": 100,
+            "compressFileSize": 51200
+        },
+        "xyz": {
+            "maxWidth": 920,
+            "maxHeight": 1280,
+            "detectFace": true,
+            "confidence": 0.8,
+            "cropImage": false,
+            "qualityCompression": 75,
+            "pixelCompression": 100
+        }
+    }
+}

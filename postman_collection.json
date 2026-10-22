@@ -1,0 +1,266 @@
+{
+  "info": {
+    "_postman_id": "8a3f5a2b-10c7-4c4f-96a2-9a3d7b8f9e11",
+    "name": "Image Validation & Face Detection Engine",
+    "description": "Postman collection for testing the standalone Image Validation & Face Detection Engine (FastAPI + OpenCV YuNet) running on port 9001.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:9001",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health & Info",
+      "item": [
+        {
+          "name": "Root Service Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Returns service metadata, version, documentation links, and registered endpoints."
+          },
+          "response": []
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Returns health status and whether the YuNet model is loaded in memory."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Validate Endpoint",
+      "item": [
+        {
+          "name": "POST /validate - Valid Image + Face Detection",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "imageFile",
+                  "type": "file",
+                  "src": "",
+                  "description": "Select an image file (.png, .jpg, .jpeg) such as tests/fixtures/single_face.jpg"
+                },
+                {
+                  "key": "maxWidth",
+                  "value": "1500",
+                  "type": "text",
+                  "description": "Maximum allowed image width (pixels)"
+                },
+                {
+                  "key": "maxHeight",
+                  "value": "1500",
+                  "type": "text",
+                  "description": "Maximum allowed image height (pixels)"
+                },
+                {
+                  "key": "detectFace",
+                  "value": "true",
+                  "type": "text",
+                  "description": "Set to true to run YuNet face detector"
+                },
+                {
+                  "key": "confidence",
+                  "value": "0.8",
+                  "type": "text",
+                  "description": "Minimum face detection confidence threshold (0.0 - 1.0)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/validate",
+              "host": ["{{baseUrl}}"],
+              "path": ["validate"]
+            },
+            "description": "Validates that image dimensions do not exceed maxWidth/maxHeight, and returns detected face bounding boxes and 5 facial landmarks."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Compress Endpoint",
+      "item": [
+        {
+          "name": "POST /compress - Using Preset (Body Prefix)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "imageFile",
+                  "type": "file",
+                  "src": "",
+                  "description": "Select an image file (.png, .jpg, .jpeg)"
+                },
+                {
+                  "key": "prefix",
+                  "value": "ipsotek",
+                  "type": "text",
+                  "description": "Optional preset prefix (e.g. ipsotek, falco, abc, xyz). Automatically applies preset defaults from config.json."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/compress",
+              "host": ["{{baseUrl}}"],
+              "path": ["compress"]
+            },
+            "description": "Calls /compress using a preset defined in config.json via multipart body prefix. When prefix is provided, configured defaults (maxWidth, maxHeight, detectFace, cropImage, qualityCompression, etc.) are automatically applied."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /compress - Using Preset (Query Param ?prefix=abc)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "imageFile",
+                  "type": "file",
+                  "src": "",
+                  "description": "Select an image file (.png, .jpg, .jpeg)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/compress?prefix=ipsotek",
+              "host": ["{{baseUrl}}"],
+              "path": ["compress"],
+              "query": [
+                {
+                  "key": "prefix",
+                  "value": "ipsotek",
+                  "description": "Preset name in config.json"
+                }
+              ]
+            },
+            "description": "Calls /compress using a query parameter ?prefix=ipsotek. Automatically applies preset settings from config.json and forwards ?prefix=ipsotek&onlyupload=true to CDN upload."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /compress - Full Manual Parameters",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "imageFile",
+                  "type": "file",
+                  "src": "",
+                  "description": "Select an image file (.png, .jpg, .jpeg)"
+                },
+                {
+                  "key": "prefix",
+                  "value": "ipsotek",
+                  "type": "text",
+                  "disabled": true,
+                  "description": "Optional string prefix to trigger presets or append to CDN upload"
+                },
+                {
+                  "key": "maxWidth",
+                  "value": "1000",
+                  "type": "text",
+                  "description": "Maximum width constraint in pixels"
+                },
+                {
+                  "key": "maxHeight",
+                  "value": "800",
+                  "type": "text",
+                  "description": "Maximum height constraint in pixels"
+                },
+                {
+                  "key": "detectFace",
+                  "value": "true",
+                  "type": "text",
+                  "description": "Set to true to run face detection (required if cropImage=true)"
+                },
+                {
+                  "key": "cropImage",
+                  "value": "true",
+                  "type": "text",
+                  "description": "Crop tightly around detected face"
+                },
+                {
+                  "key": "qualityCompression",
+                  "value": "85",
+                  "type": "text",
+                  "description": "Encoding quality percentage (1-100)"
+                },
+                {
+                  "key": "pixelCompression",
+                  "value": "100",
+                  "type": "text",
+                  "description": "Dimension percentage to retain (1-100)"
+                },
+                {
+                  "key": "confidence",
+                  "value": "0.8",
+                  "type": "text",
+                  "description": "Minimum face detection confidence threshold (0.0 - 1.0)"
+                },
+                {
+                  "key": "compressFileSize",
+                  "value": "20000",
+                  "type": "text",
+                  "description": "Target max file size in bytes (e.g. 20000 = ~20KB)"
+                },
+                {
+                  "key": "fileName",
+                  "value": "custom_image_name",
+                  "type": "text",
+                  "disabled": true,
+                  "description": "Optional custom filename for CDN storage (defaults to UUIDv4)"
+                },
+                {
+                  "key": "path",
+                  "value": "smartimage",
+                  "type": "text",
+                  "disabled": true,
+                  "description": "Optional target folder path for CDN storage"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/compress",
+              "host": ["{{baseUrl}}"],
+              "path": ["compress"]
+            },
+            "description": "Executes full manual pipeline: face detection, face-aware crop, resizing, progressive size compression, and upload to CDN."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
