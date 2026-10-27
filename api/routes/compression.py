@@ -22,7 +22,7 @@ def get_compression_service(request: Request) -> CompressionService:
     response_model=CompressionResponse,
     summary="Validate, detect face, crop, resize and compress image",
     description="""
-Process an uploaded image (`.png`, `.jpg`, `.jpeg`) with optional face detection, face-aware cropping, dimension reduction, and lossy/lossless quality compression:
+Process an uploaded image (`.png`, `.jpg`, `.jpeg`, `.webp`) with optional face detection, face-aware cropping, dimension reduction, and lossy/lossless quality compression:
 
 ### Parameters:
 - **imageFile** (*required*): Multipart binary image.
@@ -82,15 +82,6 @@ async def compress_image(
 
     # Resolve image file case-insensitively (e.g. imageFile, ImageFile, IMAGEFILE)
     effective_image_file = _get_form_field("imageFile", imageFile)
-    if not effective_image_file or not hasattr(effective_image_file, "read"):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=[{
-                "loc": ["body", "imageFile"],
-                "msg": "field required",
-                "type": "value_error.missing",
-            }]
-        )
 
     # Resolve prefix from multipart form body (direct parameter or case-insensitive fallback)
     raw_prefix = _get_form_field("prefix", prefix)
@@ -273,17 +264,18 @@ async def compress_image(
             detail="maxHeight must be strictly greater than 0."
         )
 
-    try:
-        image_bytes = await effective_image_file.read()
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to read uploaded file: {str(e)}"
-        )
+    image_bytes = b""
+    uploaded_filename = None
+    if effective_image_file and hasattr(effective_image_file, "read"):
+        uploaded_filename = getattr(effective_image_file, "filename", None)
+        try:
+            image_bytes = await effective_image_file.read()
+        except Exception:
+            image_bytes = b""
 
     response = compression_service.compress(
         image_bytes=image_bytes,
-        filename=effective_image_file.filename,
+        filename=uploaded_filename,
         max_width=int(final_max_width) if final_max_width is not None else None,
         max_height=int(final_max_height) if final_max_height is not None else None,
         detect_face=bool(final_detect_face),

@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 
 class ValidationReason(str, Enum):
     VALID = "VALID"
+    NO_IMAGE = "NO_IMAGE"
+    WRONG_FORMAT = "WRONG_FORMAT"
     INVALID_IMAGE = "INVALID_IMAGE"
     UNSUPPORTED_FORMAT = "UNSUPPORTED_FORMAT"
     FILE_TOO_LARGE = "FILE_TOO_LARGE"

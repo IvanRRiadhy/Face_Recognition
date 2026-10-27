@@ -134,7 +134,7 @@ class TestAPIEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is False
-        assert data["reason"] == "UNSUPPORTED_FORMAT"
+        assert data["reason"] == "WRONG_FORMAT"
 
     def test_validate_corrupted_image(self, client):
         response = client.post(
@@ -145,7 +145,29 @@ class TestAPIEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert data["valid"] is False
-        assert data["reason"] == "INVALID_IMAGE"
+        assert data["reason"] == "NO_IMAGE"
+
+    def test_validate_empty_or_missing_image_returns_no_image(self, client):
+        # Empty bytes
+        response = client.post(
+            "/validate",
+            files={"imageFile": ("empty.jpg", b"", "image/jpeg")},
+            data={"maxWidth": "1500", "maxHeight": "1500", "detectFace": "true"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["valid"] is False
+        assert data["reason"] == "NO_IMAGE"
+
+        # Missing imageFile field entirely
+        response_missing = client.post(
+            "/validate",
+            data={"maxWidth": "1500", "maxHeight": "1500", "detectFace": "true"},
+        )
+        assert response_missing.status_code == 200
+        data_missing = response_missing.json()
+        assert data_missing["valid"] is False
+        assert data_missing["reason"] == "NO_IMAGE"
 
     def test_validate_file_too_large(self, client):
         # Exceed MAX_UPLOAD_SIZE_MB (default 10MB)
@@ -287,7 +309,10 @@ class TestCompressAPI:
         assert face["boundingBox"]["x"] <= face["originalBoundingBox"]["x"]
 
     def test_compress_crop_requires_face_detection(self, client):
+        import base64
         file_path = os.path.join(FIXTURES_DIR, "single_face.jpg")
+        with open(file_path, "rb") as f:
+            raw_bytes = f.read()
         with open(file_path, "rb") as f:
             response = client.post(
                 "/compress",
@@ -303,9 +328,13 @@ class TestCompressAPI:
         data = response.json()
         assert data["valid"] is False
         assert data["reason"] == "CROP_REQUIRES_FACE_DETECTION"
+        assert data["imageData"] == base64.b64encode(raw_bytes).decode("utf-8")
 
     def test_compress_no_face_with_crop(self, client):
+        import base64
         file_path = os.path.join(FIXTURES_DIR, "no_face.jpg")
+        with open(file_path, "rb") as f:
+            raw_bytes = f.read()
         with open(file_path, "rb") as f:
             response = client.post(
                 "/compress",
@@ -321,9 +350,13 @@ class TestCompressAPI:
         data = response.json()
         assert data["valid"] is False
         assert data["reason"] == "NO_FACE"
+        assert data["imageData"] == base64.b64encode(raw_bytes).decode("utf-8")
 
     def test_compress_multiple_faces_with_crop_returns_MULTI_FACE(self, client):
+        import base64
         file_path = os.path.join(FIXTURES_DIR, "multiple_faces.jpg")
+        with open(file_path, "rb") as f:
+            raw_bytes = f.read()
         with open(file_path, "rb") as f:
             response = client.post(
                 "/compress",
@@ -339,6 +372,55 @@ class TestCompressAPI:
         data = response.json()
         assert data["valid"] is False
         assert data["reason"] in ("MULTIPLE_FACES", "MULTI_FACE")
+        assert data["imageData"] == base64.b64encode(raw_bytes).decode("utf-8")
+
+    def test_compress_no_image_and_wrong_format(self, client):
+        import base64
+        # 1. Corrupted image -> NO_IMAGE, still returns raw bytes as base64
+        corrupted_bytes = b"corrupted-image-content"
+        res_corrupt = client.post(
+            "/compress",
+            files={"imageFile": ("corrupt.jpg", corrupted_bytes, "image/jpeg")},
+        )
+        assert res_corrupt.status_code == 200
+        data_corrupt = res_corrupt.json()
+        assert data_corrupt["valid"] is False
+        assert data_corrupt["reason"] == "NO_IMAGE"
+        assert data_corrupt["imageData"] == base64.b64encode(corrupted_bytes).decode("utf-8")
+
+        # 2. Empty image -> NO_IMAGE, imageData is None
+        res_empty = client.post(
+            "/compress",
+            files={"imageFile": ("empty.jpg", b"", "image/jpeg")},
+        )
+        assert res_empty.status_code == 200
+        data_empty = res_empty.json()
+        assert data_empty["valid"] is False
+        assert data_empty["reason"] == "NO_IMAGE"
+        assert data_empty["imageData"] is None
+
+        # 3. Missing imageFile field -> NO_IMAGE, imageData is None
+        res_missing = client.post(
+            "/compress",
+            data={"prefix": "ipsotek"},
+        )
+        assert res_missing.status_code == 200
+        data_missing = res_missing.json()
+        assert data_missing["valid"] is False
+        assert data_missing["reason"] == "NO_IMAGE"
+        assert data_missing["imageData"] is None
+
+        # 4. Wrong format -> WRONG_FORMAT, still returns raw bytes as base64
+        wrong_fmt_bytes = b"GIF89a..."
+        res_fmt = client.post(
+            "/compress",
+            files={"imageFile": ("anim.gif", wrong_fmt_bytes, "image/gif")},
+        )
+        assert res_fmt.status_code == 200
+        data_fmt = res_fmt.json()
+        assert data_fmt["valid"] is False
+        assert data_fmt["reason"] == "WRONG_FORMAT"
+        assert data_fmt["imageData"] == base64.b64encode(wrong_fmt_bytes).decode("utf-8")
 
     def test_compress_invalid_quality_compression_returns_422(self, client):
         file_path = os.path.join(FIXTURES_DIR, "single_face.jpg")
@@ -1081,6 +1163,52 @@ class TestCompressAPI:
         assert data["file_url"] == "/smartimage/uuid-1234-5678.jpeg"
         assert data["intended_file_name"] == "ipsotek_ridwan.jpeg"
         assert data["response_file_name"] == "uuid-1234-5678.jpeg"
+
+    def test_webp_upload_converted_to_jpeg(self, client, monkeypatch):
+        import base64
+        import cv2
+        from application.cdn_uploader import CdnUploader
+
+        monkeypatch.setattr(
+            CdnUploader,
+            "upload_image",
+            lambda self, **kwargs: f"/{kwargs.get('path_folder')}/{kwargs.get('filename')}"
+        )
+
+        # Encode single_face.jpg into in-memory .webp bytes
+        file_path = os.path.join(FIXTURES_DIR, "single_face.jpg")
+        img = cv2.imread(file_path)
+        success, webp_buf = cv2.imencode(".webp", img, [cv2.IMWRITE_WEBP_QUALITY, 90])
+        assert success
+        webp_bytes = webp_buf.tobytes()
+
+        # 1. Test /validate accepts .webp
+        res_val = client.post(
+            "/validate",
+            files={"imageFile": ("single_face.webp", webp_bytes, "image/webp")},
+            data={"maxWidth": "1500", "maxHeight": "1500", "detectFace": "true"},
+        )
+        assert res_val.status_code == 200
+        val_data = res_val.json()
+        assert val_data["valid"] is True
+        assert val_data["reason"] == "VALID"
+        assert len(val_data["faces"]) == 1
+
+        # 2. Test /compress accepts .webp and converts output to jpeg
+        res_comp = client.post(
+            "/compress",
+            files={"imageFile": ("single_face.webp", webp_bytes, "image/webp")},
+            data={"detectFace": "true", "qualityCompression": "85"},
+        )
+        assert res_comp.status_code == 200
+        comp_data = res_comp.json()
+        assert comp_data["valid"] is True
+        assert comp_data["image"]["originalFormat"] == "webp"
+        assert comp_data["image"]["outputFormat"] == "jpeg"
+        assert comp_data["contentType"] == "image/jpeg"
+        # Verify returned base64 is JPEG (magic bytes \xff\xd8\xff)
+        decoded_out = base64.b64decode(comp_data["imageData"])
+        assert decoded_out[:3] == b"\xff\xd8\xff"
 
 
 

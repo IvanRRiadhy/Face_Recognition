@@ -8,9 +8,9 @@ import numpy as np
 class ImageEncoder:
     """
     Encodes image numpy array to compressed image bytes and base64.
-    Preserves format:
-    - JPEG (.jpg, .jpeg) uses qualityCompression (1-100).
-    - PNG uses lossless compression settings and preserves alpha transparency.
+    Format handling:
+    - JPEG (.jpg, .jpeg) and WebP (.webp) are encoded as JPEG using qualityCompression (1-100).
+    - PNG (.png) uses lossless compression settings and preserves alpha transparency.
     """
 
     @staticmethod
@@ -22,8 +22,10 @@ class ImageEncoder:
         ext = ".jpg"
         if filename:
             parsed_ext = os.path.splitext(filename)[1].lower()
-            if parsed_ext in {".png", ".jpg", ".jpeg"}:
-                ext = parsed_ext
+            if parsed_ext == ".png":
+                ext = ".png"
+            elif parsed_ext in {".jpg", ".jpeg", ".webp"}:
+                ext = ".jpg"
 
         quality = max(1, min(quality_compression, 100))
 

@@ -1,6 +1,6 @@
 from typing import Any, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from models.responses import ValidationResponse
+from models.responses import ValidationReason, ValidationResponse
 from application.validation_service import ValidationService
 
 router = APIRouter(tags=["Validation"])
@@ -21,7 +21,7 @@ def get_validation_service(request: Request) -> ValidationService:
     response_model=ValidationResponse,
     summary="Validate uploaded image dimensions and detect faces",
     description="""
-Upload an image (`.png`, `.jpg`, `.jpeg`) along with required parameters:
+Upload an image (`.png`, `.jpg`, `.jpeg`, `.webp`) along with required parameters:
 - **imageFile**: Multipart image binary.
 - **maxWidth**: Maximum allowed width in pixels (`width <= maxWidth` is valid).
 - **maxHeight**: Maximum allowed height in pixels (`height <= maxHeight` is valid).
@@ -97,13 +97,11 @@ async def validate_image(
 
     effective_image_file = _get_form_field("imageFile", imageFile)
     if not effective_image_file or not hasattr(effective_image_file, "read"):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=[{
-                "loc": ["body", "imageFile"],
-                "msg": "field required",
-                "type": "value_error.missing",
-            }]
+        return ValidationResponse(
+            valid=False,
+            reason=ValidationReason.NO_IMAGE,
+            image=None,
+            faces=[],
         )
 
     def _clean_val(val):
@@ -209,15 +207,12 @@ async def validate_image(
     # Read binary contents safely
     try:
         image_bytes = await effective_image_file.read()
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to read uploaded file: {str(e)}"
-        )
+    except Exception:
+        image_bytes = b""
 
     response = validation_service.validate(
         image_bytes=image_bytes,
-        filename=effective_image_file.filename,
+        filename=getattr(effective_image_file, "filename", None),
         max_width=final_max_width,
         max_height=final_max_height,
         detect_face=final_detect_face,

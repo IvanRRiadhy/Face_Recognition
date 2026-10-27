@@ -37,6 +37,15 @@ class ValidationService:
         detect_face: bool,
         confidence: Optional[float] = None,
     ) -> ValidationResponse:
+        # Step 0: Check if image bytes are present
+        if not image_bytes or len(image_bytes) == 0:
+            return ValidationResponse(
+                valid=False,
+                reason=ValidationReason.NO_IMAGE,
+                image=None,
+                faces=[],
+            )
+
         # Step 1: File size validation
         size_valid, size_reason = self.image_validator.validate_file_size(len(image_bytes))
         if not size_valid:
@@ -52,7 +61,7 @@ class ValidationService:
         if not name_valid:
             return ValidationResponse(
                 valid=False,
-                reason=name_reason or ValidationReason.UNSUPPORTED_FORMAT,
+                reason=name_reason or ValidationReason.WRONG_FORMAT,
                 image=None,
                 faces=[],
             )
@@ -62,7 +71,7 @@ class ValidationService:
         if not decode_valid or img_bgr is None or dims is None:
             return ValidationResponse(
                 valid=False,
-                reason=decode_reason or ValidationReason.INVALID_IMAGE,
+                reason=decode_reason or ValidationReason.NO_IMAGE,
                 image=None,
                 faces=[],
             )
